@@ -1,0 +1,475 @@
+//Server Application to stream Nexus 2 Python client
+//willpower2727 12/16/2014
+
+#include "Client.h"
+#include <iostream>
+#include <fstream>
+#include <cassert>
+#include <ctime>
+#include <vector>
+#include <string.h>
+#include <stdint.h>
+#include <typeinfo>//for debugging
+
+//for using TinyXML
+#include <C:\Users\Gelsey Torres-Oviedo\Documents\tinyxml_2_6_2\tinyxml\tinyxml.h>
+#include <C:\Users\Gelsey Torres-Oviedo\Documents\tinyxml_2_6_2\tinyxml\tinystr.h>
+
+//for the cpp2python server
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <stdio.h>
+#include <Windows.h>
+#pragma comment(lib, "winmm.lib")//needed for timeGetTime()
+#pragma comment(lib, "Ws2_32.lib")
+
+#ifdef WIN32
+#include <conio.h>   // For _kbhit()
+#include <cstdio>   // For getchar()
+#include <windows.h> // For Sleep()
+#else
+#include <unistd.h> // For sleep()
+#endif // WIN32
+
+//#include <time.h>
+using namespace ViconDataStreamSDK::CPP;
+
+#define output_stream if(!LogFile.empty()) ; else std::cout 
+
+namespace
+{
+	std::string Adapt(const bool i_Value)
+	{
+		return i_Value ? "True" : "False";
+	}
+
+	std::string Adapt(const Direction::Enum i_Direction)
+	{
+		switch (i_Direction)
+		{
+		case Direction::Forward:
+			return "Forward";
+		case Direction::Backward:
+			return "Backward";
+		case Direction::Left:
+			return "Left";
+		case Direction::Right:
+			return "Right";
+		case Direction::Up:
+			return "Up";
+		case Direction::Down:
+			return "Down";
+		default:
+			return "Unknown";
+		}
+	}
+
+	std::string Adapt(const DeviceType::Enum i_DeviceType)
+	{
+		switch (i_DeviceType)
+		{
+		case DeviceType::ForcePlate:
+			return "ForcePlate";
+		case DeviceType::Unknown:
+		default:
+			return "Unknown";
+		}
+	}
+
+	std::string Adapt(const Unit::Enum i_Unit)
+	{
+		switch (i_Unit)
+		{
+		case Unit::Meter:
+			return "Meter";
+		case Unit::Volt:
+			return "Volt";
+		case Unit::NewtonMeter:
+			return "NewtonMeter";
+		case Unit::Newton:
+			return "Newton";
+		case Unit::Kilogram:
+			return "Kilogram";
+		case Unit::Second:
+			return "Second";
+		case Unit::Ampere:
+			return "Ampere";
+		case Unit::Kelvin:
+			return "Kelvin";
+		case Unit::Mole:
+			return "Mole";
+		case Unit::Candela:
+			return "Candela";
+		case Unit::Radian:
+			return "Radian";
+		case Unit::Steradian:
+			return "Steradian";
+		case Unit::MeterSquared:
+			return "MeterSquared";
+		case Unit::MeterCubed:
+			return "MeterCubed";
+		case Unit::MeterPerSecond:
+			return "MeterPerSecond";
+		case Unit::MeterPerSecondSquared:
+			return "MeterPerSecondSquared";
+		case Unit::RadianPerSecond:
+			return "RadianPerSecond";
+		case Unit::RadianPerSecondSquared:
+			return "RadianPerSecondSquared";
+		case Unit::Hertz:
+			return "Hertz";
+		case Unit::Joule:
+			return "Joule";
+		case Unit::Watt:
+			return "Watt";
+		case Unit::Pascal:
+			return "Pascal";
+		case Unit::Lumen:
+			return "Lumen";
+		case Unit::Lux:
+			return "Lux";
+		case Unit::Coulomb:
+			return "Coulomb";
+		case Unit::Ohm:
+			return "Ohm";
+		case Unit::Farad:
+			return "Farad";
+		case Unit::Weber:
+			return "Weber";
+		case Unit::Tesla:
+			return "Tesla";
+		case Unit::Henry:
+			return "Henry";
+		case Unit::Siemens:
+			return "Siemens";
+		case Unit::Becquerel:
+			return "Becquerel";
+		case Unit::Gray:
+			return "Gray";
+		case Unit::Sievert:
+			return "Sievert";
+		case Unit::Katal:
+			return "Katal";
+
+		case Unit::Unknown:
+		default:
+			return "Unknown";
+		}
+	}
+#ifdef WIN32
+	bool Hit()
+	{
+		bool hit = false;
+		while (_kbhit())
+		{
+			getchar();
+			hit = true;
+		}
+		return hit;
+	}
+#endif
+}
+
+
+int main(int argc, char* argv[])
+{
+
+	//std::string HostName = "localhost:801";
+	std::string HostName = "BIOE-PC:801";//define where Nexus will be available, always on port 801
+
+	// Make a new client
+	Client MyClient;//from ViconSDK
+	bool ok = false;
+	ok = (MyClient.Connect(HostName).Result == Result::Success);//returns true for successful connection, false for failed attempt
+	if (!ok)
+	{
+		std::cout << "Warning - connect failed..." << std::endl;
+	}
+
+	// Enable some different data types
+	MyClient.EnableSegmentData();
+	MyClient.EnableMarkerData();
+	//MyClient.EnableUnlabeledMarkerData();//don't care about this stuff right now
+	MyClient.EnableDeviceData();
+	std::cout << "Segment Data Enabled: " << Adapt(MyClient.IsSegmentDataEnabled().Enabled) << std::endl;
+	std::cout << "Marker Data Enabled: " << Adapt(MyClient.IsMarkerDataEnabled().Enabled) << std::endl;
+	std::cout << "Unlabeled Marker Data Enabled: " << Adapt(MyClient.IsUnlabeledMarkerDataEnabled().Enabled) << std::endl;
+	std::cout << "Device Data Enabled: " << Adapt(MyClient.IsDeviceDataEnabled().Enabled) << std::endl;
+	std::cout << "Centroid Data Enabled: " << Adapt(MyClient.IsCentroidDataEnabled().Enabled);
+	
+	//MyClient.SetStreamMode(ViconDataStreamSDK::CPP::StreamMode::ServerPush);
+	MyClient.SetStreamMode(ViconDataStreamSDK::CPP::StreamMode::ClientPull);
+	//MyClient should be ready to go...
+
+	//Now setup the CPP2Python server
+	WSADATA wsaData;//declare wsa variable
+	int iResult;
+	// Initialize Winsock
+	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (iResult != 0) {
+		printf("WSAStartup failed: %d\n", iResult);
+		printf("\n");
+		return 1;
+	}
+	else if (iResult == 0){
+		printf("WSAStartup succeeded!");
+		printf("\n");
+	}
+	#define DEFAULT_PORT "50008"//port # to communicate on with Python
+	struct addrinfo *result = NULL, *ptr = NULL, hints;
+	ZeroMemory(&hints, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+	hints.ai_flags = AI_PASSIVE;
+
+	// Resolve the local address and port to be used by the server
+	iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
+	if (iResult != 0) {
+		printf("getaddrinfo failed: %d\n", iResult);
+		printf("\n ");
+		WSACleanup();
+		return 1;
+	}
+	else if (iResult == 0){
+		printf("getaddrinfo succeeded!\n");
+	}
+	SOCKET ListenSocket = INVALID_SOCKET;//socket for listening for a connection
+
+	// Create a SOCKET for the server to listen for client connections
+	ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+	//check for errors
+	if (ListenSocket == INVALID_SOCKET) {
+		printf("Error at socket(): %ld\n", WSAGetLastError());
+		freeaddrinfo(result);
+		WSACleanup();
+		return 1;
+	}
+	// Setup the TCP listening socket
+	iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
+	if (iResult == SOCKET_ERROR) {
+		printf("bind failed with error: %d\n", WSAGetLastError());
+		freeaddrinfo(result);
+		closesocket(ListenSocket);
+		WSACleanup();
+		return 1;
+	}
+	freeaddrinfo(result);//release the memory dedicated to the address info no longer needed
+	//Listen for a connection
+	if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR) {
+		printf("Listen failed with error: %ld\n", WSAGetLastError());
+		closesocket(ListenSocket);
+		WSACleanup();
+		return 1;
+	}
+	else{
+		printf("Waiting for Client to connect...");
+	}
+
+	SOCKET ClientSocket;//temporary socket used to listen for client
+	ClientSocket = INVALID_SOCKET;
+	// Accept a client socket
+	ClientSocket = accept(ListenSocket, NULL, NULL);
+	if (ClientSocket == INVALID_SOCKET) {
+		printf("accept failed: %d\n", WSAGetLastError());
+		closesocket(ListenSocket);
+		WSACleanup();
+		return 1;
+	}
+	else{
+		printf("\n");
+		printf("Python client Accepted!");
+	}
+
+	#define DEFAULT_BUFLEN 512//the buffer length, doesn't need to be long for this part
+
+	char recvbuf[DEFAULT_BUFLEN];
+	int iSendResult;
+	int recvbuflen = DEFAULT_BUFLEN;
+	// Receive request and send Myclient data until the Client shuts down the connection
+	do {
+
+		iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+		if (iResult > 0) {
+			printf("Bytes received: %d\n", iResult);
+			//printf(recvbuf);
+			//std::cout << recvbuf << '\n';
+
+			//Get MyClient frame
+			Output_GetFrame temp;
+			temp = MyClient.GetFrame();//ask for a frame
+			std::cout << "Frame Number: " << MyClient.GetFrameNumber().FrameNumber << std::endl;
+			
+			//prepare frame data to serialize:
+			//Use tinyXML to create packet to send to Python
+			TiXmlDocument Frame;//name of xml objcet
+
+			//TiXmlDeclaration * decl = new TiXmlDeclaration("1.0", "UTF-8", "0");//not really sure if this is required here but it might be important for some programs
+			//Frame.LinkEndChild(decl);//important header
+
+			TiXmlElement * element0 = new TiXmlElement("Frame");//Root name
+			Frame.LinkEndChild(element0);//link it to the document
+
+			//start adding elements:
+			TiXmlElement * element1 = new TiXmlElement("FrameNumber");
+			element1->SetAttribute("attribute", MyClient.GetFrameNumber().FrameNumber);//store the frame #
+			std::cout << "Frame Number: " << MyClient.GetFrameNumber().FrameNumber << std::endl;
+			element0->LinkEndChild(element1); //link
+
+			TiXmlElement * element2 = new TiXmlElement("Time");
+			element2->SetAttribute("attribute", timeGetTime());//current time in milliseconds as an integer
+			element0->LinkEndChild(element2);//link
+
+			TiXmlElement * element3 = new TiXmlElement("Forceplatedata");
+			element0->LinkEndChild(element3);
+
+			//get forceplate data and place in xml 
+			unsigned int ForcePlateCount = MyClient.GetForcePlateCount().ForcePlateCount;
+			for (unsigned int ForcePlateIndex = 0; ForcePlateIndex < ForcePlateCount; ++ForcePlateIndex)//loop through each forceplate
+			{
+				//add child element for each forceplate
+				char buffer[33];//used to convert int to string, it's empty
+				char buffer2[50];//also empty
+				char * result = strcpy(buffer2,"Forceplate_");
+				char * result2 = strcat(buffer2, itoa(ForcePlateIndex, buffer, 10));
+				//printf(result2);
+				//std::cout << "Forceplate index is: " << itoa(ForcePlateIndex, buffer, 10) << "\n";
+					
+				TiXmlElement * element4 = new TiXmlElement(result2);
+			    element3->LinkEndChild(element4);
+
+				unsigned int ForcePlateSubsamples = MyClient.GetForcePlateSubsamples(ForcePlateIndex).ForcePlateSubsamples;
+				//for each forceplate loop through subsamples to get components X Y Z. The Forceplates run at 1000 Hz, faster than the cameras so there is more data here to keep track of
+				for (unsigned int ForcePlateSubsample = 0; ForcePlateSubsample < ForcePlateSubsamples; ++ForcePlateSubsample)
+				{
+					Output_GetGlobalForceVector Gforce = MyClient.GetGlobalForceVector(ForcePlateIndex, ForcePlateSubsample);
+
+					char buffer4[50];
+					char * result3 = strcpy(buffer4, "Subframe_");
+					char * result4 = strcat(buffer4, itoa(ForcePlateSubsample, buffer, 10));
+
+					TiXmlElement * element5 = new TiXmlElement(result4);
+					TiXmlElement * element6 = new TiXmlElement("F_x");
+					element6->SetAttribute("attribute", Gforce.ForceVector[0]);
+					element5->LinkEndChild(element6);//link component to subframe
+					element4->LinkEndChild(element5);//link subframe to forceplate #
+
+					TiXmlElement * element7 = new TiXmlElement("F_y");
+					element7->SetAttribute("attribute", Gforce.ForceVector[1]);
+					element5->LinkEndChild(element7);
+
+					TiXmlElement * element8 = new TiXmlElement("F_z");
+					element8->SetAttribute("attribute", Gforce.ForceVector[2]);
+					element5->LinkEndChild(element8);
+				}
+
+			}
+
+			//loop through how many subjects are being tracked in real time:
+			unsigned int SubjectCount = MyClient.GetSubjectCount().SubjectCount;
+			for (unsigned int SubjectIndex = 0; SubjectIndex < SubjectCount; ++SubjectIndex)
+			{
+				char buffer[33];
+				char buffer6[50];
+				std::string SubjectName = MyClient.GetSubjectName(SubjectIndex).SubjectName;
+				char * result5 = strcpy(buffer6, "Subject");
+				char * result6 = strcat(buffer6, itoa(SubjectIndex, buffer, 10));
+
+				TiXmlElement * element9 = new TiXmlElement(result6);//subjects are labeled by # in the xml, not by name though the name is recorded
+				element9->SetAttribute("attribute", SubjectName.c_str());
+				
+				//Prepare marker data
+				unsigned int MarkerCount = MyClient.GetMarkerCount(SubjectName).MarkerCount;
+				for (unsigned int MarkerIndex = 0; MarkerIndex < MarkerCount; ++MarkerIndex)
+				{
+					std::string MarkerName = MyClient.GetMarkerName(SubjectName, MarkerIndex).MarkerName;//get marker name
+					Output_GetMarkerGlobalTranslation Output_GetMarkerGlobalTranslation = MyClient.GetMarkerGlobalTranslation(SubjectName, MarkerName);//get vector of marker position
+					TiXmlElement * element10 = new TiXmlElement(MarkerName.c_str());
+					TiXmlElement * element11 = new TiXmlElement("X");
+					element11->SetAttribute("attribute", Output_GetMarkerGlobalTranslation.Translation[0]);
+					TiXmlElement * element12 = new TiXmlElement("Y");
+					element12->SetAttribute("attribute", Output_GetMarkerGlobalTranslation.Translation[1]);
+					TiXmlElement * element13 = new TiXmlElement("Z");
+					element13->SetAttribute("attribute", Output_GetMarkerGlobalTranslation.Translation[2]);
+
+					//link everything to 9
+					element10->LinkEndChild(element11);//link X
+					element10->LinkEndChild(element12);//link Y
+					element10->LinkEndChild(element13);//link Z
+					element9->LinkEndChild(element10);//link marker to subject
+
+				}
+				element0->LinkEndChild(element9);//link subject to the xml
+			}
+
+
+			//Frame.SaveFile("test.xml");//for debugging
+			
+			//Serialize the Frame xml to send
+			TiXmlPrinter packet;//initialize a xml printer
+			packet.SetIndent("\t");
+			Frame.Accept(&packet);
+			std::string packetready = packet.CStr();
+			std::cout << "Size of the packet: " << packetready.size() << "\n";//display the serialization size
+			//std::cout << packetready << "\n";//display the serialization
+			//iSendResult = send(ClientSocket, (char *)test.c_str(), sizeof(test), 0);
+
+			//before sending the xml, tell Python the size of the xml so it can recieve the complete xml and not parts of it
+			char buf[50];
+			std::string framesize = itoa(packetready.size(), buf, 10);
+			char buf2[50];
+			char * res1 = strcpy(buf2, "New");
+			char * res2 = strcat(buf2, framesize.c_str());
+			iSendResult = send(ClientSocket, (char *)res2,sizeof(res2), 0);//tell python there is a new frame ready and its' size
+			printf("New size Bytes sent: %d\n", iSendResult);
+			
+			if (iSendResult == SOCKET_ERROR) {
+				printf("send to Python Client failed: %d\n", WSAGetLastError());
+				closesocket(ClientSocket);
+				WSACleanup();
+				std::cout << " Disconnecting from Nexus..." << std::endl;
+				MyClient.Disconnect();
+				//return 1;//if we return 1 we wont see the error messages in the console
+			}
+			//listen for a reply before sending xml frame
+			iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+			//Now send the actual xml
+			iSendResult = send(ClientSocket, (char *)packetready.c_str(), packetready.size(), 0);//send the xml
+			// Echo the buffer back to the sender
+			//iSendResult = send(ClientSocket, recvbuf, iResult, 0);
+
+			if (iSendResult == SOCKET_ERROR) {
+				printf("send to Python Client failed: %d\n", WSAGetLastError());
+				closesocket(ClientSocket);
+				WSACleanup();
+				std::cout << " Disconnecting from Nexus..." << std::endl;
+				MyClient.Disconnect();
+				//return 1;//if we return 1 we wont see the error messages in the console
+			}
+			printf("Bytes sent: %d\n", iSendResult);
+		}
+		else if (iResult == 0){
+			printf("Connection to Python closing...\n");
+			std::cout << " Disconnecting from Nexus..." << std::endl;
+			MyClient.Disconnect();
+		}
+		else {
+			printf("recv failed: %d\n", WSAGetLastError());
+			closesocket(ClientSocket);
+			WSACleanup();
+			std::cout << " Disconnecting from Nexus..." << std::endl;
+			MyClient.Disconnect();
+			//return 1;
+		}
+
+	} while (iResult > 0);
+
+	printf("Python Client is disconnected...");
+	printf("\n");
+	printf("Nexus Client is disconnected...");
+	printf("\n");
+	printf("Press any key to quit");
+	getch();
+	return 0;
+}
+
