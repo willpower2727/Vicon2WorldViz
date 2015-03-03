@@ -350,16 +350,16 @@ int main(int argc, char* argv[])
 
 					TiXmlElement * element5 = new TiXmlElement(result4);
 					TiXmlElement * element6 = new TiXmlElement("F_x");
-					element6->SetAttribute("attribute", Gforce.ForceVector[0]);
+					element6->SetDoubleAttribute("attribute", Gforce.ForceVector[0]);
 					element5->LinkEndChild(element6);//link component to subframe
 					element4->LinkEndChild(element5);//link subframe to forceplate #
 
 					TiXmlElement * element7 = new TiXmlElement("F_y");
-					element7->SetAttribute("attribute", Gforce.ForceVector[1]);
+					element7->SetDoubleAttribute("attribute", Gforce.ForceVector[1]);
 					element5->LinkEndChild(element7);
 
 					TiXmlElement * element8 = new TiXmlElement("F_z");
-					element8->SetAttribute("attribute", Gforce.ForceVector[2]);
+					element8->SetDoubleAttribute("attribute", Gforce.ForceVector[2]);
 					element5->LinkEndChild(element8);
 				}
 
@@ -386,11 +386,11 @@ int main(int argc, char* argv[])
 					Output_GetMarkerGlobalTranslation Output_GetMarkerGlobalTranslation = MyClient.GetMarkerGlobalTranslation(SubjectName, MarkerName);//get vector of marker position
 					TiXmlElement * element10 = new TiXmlElement(MarkerName.c_str());
 					TiXmlElement * element11 = new TiXmlElement("X");
-					element11->SetAttribute("attribute", Output_GetMarkerGlobalTranslation.Translation[0]);
+					element11->SetDoubleAttribute("attribute", Output_GetMarkerGlobalTranslation.Translation[0]);
 					TiXmlElement * element12 = new TiXmlElement("Y");
-					element12->SetAttribute("attribute", Output_GetMarkerGlobalTranslation.Translation[1]);
+					element12->SetDoubleAttribute("attribute", Output_GetMarkerGlobalTranslation.Translation[1]);
 					TiXmlElement * element13 = new TiXmlElement("Z");
-					element13->SetAttribute("attribute", Output_GetMarkerGlobalTranslation.Translation[2]);
+					element13->SetDoubleAttribute("attribute", Output_GetMarkerGlobalTranslation.Translation[2]);
 
 					//link everything to 9
 					element10->LinkEndChild(element11);//link X
