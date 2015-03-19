@@ -34,7 +34,7 @@ def runclient(root,q):#client to receive xml from c++ server
 	s.connect((HOST,PORT))
 	s.send('1')
 	while not endflag.isSet():
-		data = s.recv(50)#receive the initial message
+		data = s.recv(8)#receive the initial message
 		data3 = data[:3]#get first 3 letters
 		if (data3 == "New"):#this means there is a new frame ready to send
 			nextsizestring = data[3:]
