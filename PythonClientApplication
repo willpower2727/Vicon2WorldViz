@@ -9,13 +9,14 @@ import Queue
 
 viz.go()#start worldviz
 
-def UpdateViz(root,q):#thread to update WorldViz objects
+def UpdateViz(root,q):#thread to update WorldViz objects/avatars etc
 	while not endflag.isSet():
 		root = q.get()#pull xml from the queue
 		
 		# parse xml...
 		
 		#update Worldviz objects...
+		#this part of the code is up to you...
 	
 def runclient(root,q):#client to receive xml from c++ server
 	
@@ -57,6 +58,7 @@ def runclient(root,q):#client to receive xml from c++ server
 	s.close()
 
 endflag = threading.Event()
+
 def raisestop(sign):#run's when "q" is pressed on the keyboard
 	print("stop flag raised")
 	endflag.set()
