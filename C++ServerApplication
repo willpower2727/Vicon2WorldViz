@@ -1,7 +1,7 @@
 //Server Application to stream Nexus 2 Python client
 //willpower2727 12/16/2014
 
-#include "Client.h"
+#include "Client.h"//from vicons SDK
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -36,7 +36,7 @@ using namespace ViconDataStreamSDK::CPP;
 
 #define output_stream if(!LogFile.empty()) ; else std::cout 
 
-namespace
+namespace //namespace definition copied from vicon SDK example cpp file
 {
 	std::string Adapt(const bool i_Value)
 	{
@@ -286,6 +286,7 @@ int main(int argc, char* argv[])
 	char recvbuf[DEFAULT_BUFLEN];
 	int iSendResult;
 	int recvbuflen = DEFAULT_BUFLEN;
+	
 	// Receive request and send Myclient data until the Client shuts down the connection
 	do {
 
