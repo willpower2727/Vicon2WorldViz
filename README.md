@@ -6,6 +6,8 @@ As of 6/3/2015, there is no supported or other opensource method of streaming mo
 Method:
   Using Vicon SDK a c++ server app requests and relays frame data to a multi-threaded python app that updates Vizard in "real" time. The c++ app in this example reformats frame data into xml string for serialization to the Vizard client. 
   
+Unfortunately I cannot post an executable, since I legally can't re-distrubte the Vicon SDK...
+  
 Requirements:
   - Windows 7 (not sure if this works in other Windows or MacOS)
   - Vicon Nexus 1.8.5 or 2.0
