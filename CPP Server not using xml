@@ -1,0 +1,435 @@
+//Server Application to stream Nexus 2 Python client
+//streamlined for using 2+ Vicon models in live mode, one of which is DK2
+//IMPORTANT: name of the OcculusDK2 model must be "DK2" or it won't work
+//willpower2727 10/6/2015
+
+#include "Client.h"
+#include <iostream>
+#include <fstream>
+#include <cassert>
+#include <ctime>
+#include <vector>
+#include <string.h>
+#include <stdint.h>
+#include <typeinfo>//for debugging
+
+//for the cpp2python server
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <stdio.h>
+#include <Windows.h>
+#pragma comment(lib, "winmm.lib")//needed for timeGetTime()
+#pragma comment(lib, "Ws2_32.lib")
+
+#ifdef WIN32
+#include <conio.h>   // For _kbhit()
+#include <cstdio>   // For getchar()
+#include <windows.h> // For Sleep()
+#else
+#include <unistd.h> // For sleep()
+#endif // WIN32
+
+//#include <time.h>
+using namespace ViconDataStreamSDK::CPP;
+
+#define output_stream if(!LogFile.empty()) ; else std::cout 
+
+namespace
+{
+	std::string Adapt(const bool i_Value)
+	{
+		return i_Value ? "True" : "False";
+	}
+
+	std::string Adapt(const Direction::Enum i_Direction)
+	{
+		switch (i_Direction)
+		{
+		case Direction::Forward:
+			return "Forward";
+		case Direction::Backward:
+			return "Backward";
+		case Direction::Left:
+			return "Left";
+		case Direction::Right:
+			return "Right";
+		case Direction::Up:
+			return "Up";
+		case Direction::Down:
+			return "Down";
+		default:
+			return "Unknown";
+		}
+	}
+
+	std::string Adapt(const DeviceType::Enum i_DeviceType)
+	{
+		switch (i_DeviceType)
+		{
+		case DeviceType::ForcePlate:
+			return "ForcePlate";
+		case DeviceType::Unknown:
+		default:
+			return "Unknown";
+		}
+	}
+
+	std::string Adapt(const Unit::Enum i_Unit)
+	{
+		switch (i_Unit)
+		{
+		case Unit::Meter:
+			return "Meter";
+		case Unit::Volt:
+			return "Volt";
+		case Unit::NewtonMeter:
+			return "NewtonMeter";
+		case Unit::Newton:
+			return "Newton";
+		case Unit::Kilogram:
+			return "Kilogram";
+		case Unit::Second:
+			return "Second";
+		case Unit::Ampere:
+			return "Ampere";
+		case Unit::Kelvin:
+			return "Kelvin";
+		case Unit::Mole:
+			return "Mole";
+		case Unit::Candela:
+			return "Candela";
+		case Unit::Radian:
+			return "Radian";
+		case Unit::Steradian:
+			return "Steradian";
+		case Unit::MeterSquared:
+			return "MeterSquared";
+		case Unit::MeterCubed:
+			return "MeterCubed";
+		case Unit::MeterPerSecond:
+			return "MeterPerSecond";
+		case Unit::MeterPerSecondSquared:
+			return "MeterPerSecondSquared";
+		case Unit::RadianPerSecond:
+			return "RadianPerSecond";
+		case Unit::RadianPerSecondSquared:
+			return "RadianPerSecondSquared";
+		case Unit::Hertz:
+			return "Hertz";
+		case Unit::Joule:
+			return "Joule";
+		case Unit::Watt:
+			return "Watt";
+		case Unit::Pascal:
+			return "Pascal";
+		case Unit::Lumen:
+			return "Lumen";
+		case Unit::Lux:
+			return "Lux";
+		case Unit::Coulomb:
+			return "Coulomb";
+		case Unit::Ohm:
+			return "Ohm";
+		case Unit::Farad:
+			return "Farad";
+		case Unit::Weber:
+			return "Weber";
+		case Unit::Tesla:
+			return "Tesla";
+		case Unit::Henry:
+			return "Henry";
+		case Unit::Siemens:
+			return "Siemens";
+		case Unit::Becquerel:
+			return "Becquerel";
+		case Unit::Gray:
+			return "Gray";
+		case Unit::Sievert:
+			return "Sievert";
+		case Unit::Katal:
+			return "Katal";
+
+		case Unit::Unknown:
+		default:
+			return "Unknown";
+		}
+	}
+#ifdef WIN32
+	bool Hit()
+	{
+		bool hit = false;
+		while (_kbhit())
+		{
+			getchar();
+			hit = true;
+		}
+		return hit;
+	}
+#endif
+}
+
+
+int main(int argc, char* argv[])
+{
+
+	//std::string HostName = "localhost:801";
+	std::string HostName = "BIOE-PC:801";//define where Nexus will be available, always on port 801
+
+	// Make a new client
+	Client MyClient;//from ViconSDK
+	bool ok = false;
+	ok = (MyClient.Connect(HostName).Result == Result::Success);//returns true for successful connection, false for failed attempt
+	if (!ok)
+	{
+		std::cout << "Warning - connect failed..." << std::endl;
+	}
+
+	// Enable some different data types
+	//MyClient.EnableSegmentData();
+	MyClient.EnableMarkerData();
+	//MyClient.EnableUnlabeledMarkerData();//don't care about this stuff right now
+	MyClient.EnableDeviceData();
+	std::cout << "Segment Data Enabled: " << Adapt(MyClient.IsSegmentDataEnabled().Enabled) << std::endl;
+	std::cout << "Marker Data Enabled: " << Adapt(MyClient.IsMarkerDataEnabled().Enabled) << std::endl;
+	std::cout << "Unlabeled Marker Data Enabled: " << Adapt(MyClient.IsUnlabeledMarkerDataEnabled().Enabled) << std::endl;
+	std::cout << "Device Data Enabled: " << Adapt(MyClient.IsDeviceDataEnabled().Enabled) << std::endl;
+	std::cout << "Centroid Data Enabled: " << Adapt(MyClient.IsCentroidDataEnabled().Enabled);
+
+	//MyClient.SetStreamMode(ViconDataStreamSDK::CPP::StreamMode::ClientPull);//good
+	//MyClient.SetStreamMode(ViconDataStreamSDK::CPP::StreamMode::ClientPullPreFetch);//better
+	MyClient.SetStreamMode(ViconDataStreamSDK::CPP::StreamMode::ServerPush);//best
+	
+	//MyClient should be ready to go...
+	unsigned int ClientBufferSize = 60;//120 frames of buffer (100 seconds)
+	MyClient.SetBufferSize(ClientBufferSize);//make room for the cupcake!
+
+	//Now setup the CPP2Python server
+	WSADATA wsaData;//declare wsa variable
+	int iResult;
+	// Initialize Winsock
+	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (iResult != 0) {
+		printf("WSAStartup failed: %d\n", iResult);
+		printf("\n");
+		return 1;
+	}
+	else if (iResult == 0){
+		printf("WSAStartup succeeded!");
+		printf("\n");
+	}
+#define DEFAULT_PORT "50008"//port # to communicate on with Python
+	struct addrinfo *result = NULL, *ptr = NULL, hints;
+	ZeroMemory(&hints, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+	hints.ai_flags = AI_PASSIVE;
+
+	// Resolve the local address and port to be used by the server
+	iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
+	if (iResult != 0) {
+		printf("getaddrinfo failed: %d\n", iResult);
+		printf("\n ");
+		WSACleanup();
+		return 1;
+	}
+	else if (iResult == 0){
+		printf("getaddrinfo succeeded!\n");
+	}
+	SOCKET ListenSocket = INVALID_SOCKET;//socket for listening for a connection
+
+	// Create a SOCKET for the server to listen for client connections
+	ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+	//check for errors
+	if (ListenSocket == INVALID_SOCKET) {
+		printf("Error at socket(): %ld\n", WSAGetLastError());
+		freeaddrinfo(result);
+		WSACleanup();
+		return 1;
+	}
+	// Setup the TCP listening socket
+	iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
+	if (iResult == SOCKET_ERROR) {
+		printf("bind failed with error: %d\n", WSAGetLastError());
+		freeaddrinfo(result);
+		closesocket(ListenSocket);
+		WSACleanup();
+		return 1;
+	}
+	freeaddrinfo(result);//release the memory dedicated to the address info no longer needed
+	//Listen for a connection
+	if (listen(ListenSocket, SOMAXCONN) == SOCKET_ERROR) {
+		printf("Listen failed with error: %ld\n", WSAGetLastError());
+		closesocket(ListenSocket);
+		WSACleanup();
+		return 1;
+	}
+	else{
+		printf("Waiting for Client to connect...");
+	}
+
+	SOCKET ClientSocket;//temporary socket used to listen for client
+	ClientSocket = INVALID_SOCKET;
+	// Accept a client socket
+	ClientSocket = accept(ListenSocket, NULL, NULL);
+	if (ClientSocket == INVALID_SOCKET) {
+		printf("accept failed: %d\n", WSAGetLastError());
+		closesocket(ListenSocket);
+		WSACleanup();
+		return 1;
+	}
+	else{
+		printf("\n");
+		printf("Python client Accepted!");
+	}
+
+#define DEFAULT_BUFLEN 512//the buffer length, doesn't need to be long for this part
+
+	char recvbuf[DEFAULT_BUFLEN];
+	int iSendResult;
+	int recvbuflen = DEFAULT_BUFLEN;
+	// Receive request and send Myclient data until the Client shuts down the connection
+	do {
+
+		iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+		if (iResult > 0) {
+			printf("Bytes received: %d\n", iResult);
+			//printf(recvbuf);
+			//std::cout << recvbuf << '\n';
+
+			//Get MyClient frame
+			Output_GetFrame temp = MyClient.GetFrame();//ask for a frame
+			//temp = MyClient.GetFrame();//ask for a frame
+			//std::cout << "Frame Number: " << MyClient.GetFrameNumber().FrameNumber << std::endl;
+
+			std::string Framebuf = "";//Begin construction of string serialization of data
+			Framebuf.reserve(2000);//make room for the cupcake!
+			Framebuf += std::to_string(MyClient.GetFrameNumber().FrameNumber);
+			Framebuf += ",";//comma separated
+
+			//get forceplate data
+			unsigned int ForcePlateCountReal = MyClient.GetForcePlateCount().ForcePlateCount;
+			if (ForcePlateCountReal < 2)//check to see if this is going to crash
+			{
+				std::cout << "Warning! Incorrect # of Forceplates Detected, check Nexus System Config" << std::endl;
+			}
+			unsigned int ForcePlateCount = 2;
+			for (unsigned int ForcePlateIndex = 0; ForcePlateIndex < ForcePlateCount; ++ForcePlateIndex)//loop through each forceplate (I only care about the first 2)
+			{
+				unsigned int ForcePlateSubsamples = MyClient.GetForcePlateSubsamples(ForcePlateIndex).ForcePlateSubsamples;
+				//for each forceplate loop through subsamples to get components X Y Z. The Forceplates run at 1000 Hz, faster than the cameras so there is more data here to keep track of
+				for (unsigned int ForcePlateSubsample = ForcePlateSubsamples-1; ForcePlateSubsample < ForcePlateSubsamples; ++ForcePlateSubsample)//just grab the most recent data, the last sub-sample
+				{
+					Output_GetGlobalForceVector Gforce = MyClient.GetGlobalForceVector(ForcePlateIndex, ForcePlateSubsample);
+					Framebuf += std::to_string(Gforce.ForceVector[2]);
+					Framebuf += ",";
+				}
+
+			}
+
+			//loop through how many subjects are being tracked in real time:
+			unsigned int SubjectCount = MyClient.GetSubjectCount().SubjectCount;
+			for (unsigned int SubjectIndex = 0; SubjectIndex < SubjectCount; ++SubjectIndex)
+			{
+				std::string SubjectName = MyClient.GetSubjectName(SubjectIndex).SubjectName;
+
+				//Prepare marker data
+				unsigned int MarkerCount = MyClient.GetMarkerCount(SubjectName).MarkerCount;
+				for (unsigned int MarkerIndex = 0; MarkerIndex < MarkerCount; ++MarkerIndex)
+				{
+
+					if (SubjectName == "DK2")//This subject is the HMD 
+					{
+						std::string MarkerName = MyClient.GetMarkerName(SubjectName, MarkerIndex).MarkerName;//get marker name
+						Output_GetMarkerGlobalTranslation Output_GetMarkerGlobalTranslation = MyClient.GetMarkerGlobalTranslation(SubjectName, MarkerName);//get vector of marker position
+						Framebuf += MarkerName;
+						Framebuf += ",";
+						Framebuf += std::to_string(Output_GetMarkerGlobalTranslation.Translation[0]);
+						Framebuf += ",";
+						Framebuf += std::to_string(Output_GetMarkerGlobalTranslation.Translation[1]);
+						Framebuf += ",";
+						Framebuf += std::to_string(Output_GetMarkerGlobalTranslation.Translation[2]);
+						Framebuf += ",";
+					}
+					else //subject is some other model, usually the PlugInGait_MAR_Default
+					{
+							std::string MarkerName = MyClient.GetMarkerName(SubjectName, MarkerIndex).MarkerName;//get marker name
+							if ((MarkerName == "RGT") || (MarkerName == "LGT") || (MarkerName == "RANK") || (MarkerName == "LANK"))
+							{
+								Output_GetMarkerGlobalTranslation Output_GetMarkerGlobalTranslation = MyClient.GetMarkerGlobalTranslation(SubjectName, MarkerName);//get vector of marker position
+								Framebuf += MarkerName;
+								Framebuf += ",";
+								Framebuf += std::to_string(Output_GetMarkerGlobalTranslation.Translation[0]);
+								Framebuf += ",";
+								Framebuf += std::to_string(Output_GetMarkerGlobalTranslation.Translation[1]);
+								Framebuf += ",";
+								Framebuf += std::to_string(Output_GetMarkerGlobalTranslation.Translation[2]);
+								Framebuf += ",";
+							}
+					}
+				}
+			}
+
+			std::cout << "Size of the packet: " << Framebuf.size() << "\n";//display the serialization size
+			//std::cout << Framebuf << "\n";//display the serialization
+			//iSendResult = send(ClientSocket, (char *)test.c_str(), sizeof(test), 0);
+
+			//before sending, tell Python the size of the xml so it can recieve the complete packet and not parts of it
+			char buf[50];
+			std::string framesize = itoa(Framebuf.size(), buf, 10);
+			char buf2[50];
+			char * res1 = strcpy(buf2, "New");
+			char * res2 = strcat(buf2, framesize.c_str());
+			iSendResult = send(ClientSocket, (char *)res2, sizeof(res2), 0);//tell python there is a new frame ready and its' size
+			printf("New size Bytes sent: %d\n", iSendResult);
+
+			if (iSendResult == SOCKET_ERROR) {
+				printf("send to Python Client failed: %d\n", WSAGetLastError());
+				closesocket(ClientSocket);
+				WSACleanup();
+				std::cout << " Disconnecting from Nexus..." << std::endl;
+				MyClient.Disconnect();
+				//return 1;//if we return 1 we wont see the error messages in the console
+			}
+			//listen for a reply before sending
+			iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
+			//Now send the actual data
+			iSendResult = send(ClientSocket, (char *)Framebuf.c_str(), Framebuf.size(), 0);//send the xml
+			// Echo the buffer back to the sender
+			//iSendResult = send(ClientSocket, recvbuf, iResult, 0);
+
+			if (iSendResult == SOCKET_ERROR) {
+				printf("send to Python Client failed: %d\n", WSAGetLastError());
+				closesocket(ClientSocket);
+				WSACleanup();
+				std::cout << " Disconnecting from Nexus..." << std::endl;
+				MyClient.Disconnect();
+				//return 1;//if we return 1 we wont see the error messages in the console
+			}
+			printf("Bytes sent: %d\n", iSendResult);
+		}
+		else if (iResult == 0){
+			printf("Connection to Python closing...\n");
+			std::cout << " Disconnecting from Nexus..." << std::endl;
+			MyClient.Disconnect();
+		}
+		else {
+			printf("recv failed: %d\n", WSAGetLastError());
+			closesocket(ClientSocket);
+			WSACleanup();
+			std::cout << " Disconnecting from Nexus..." << std::endl;
+			MyClient.Disconnect();
+			//return 1;
+		}
+
+	} while (iResult > 0);
+
+	printf("Python Client is disconnected...");
+	printf("\n");
+	printf("Nexus Client is disconnected...");
+	printf("\n");
+	printf("Press any key to quit");
+	getch();
+	return 0;
+}
+
