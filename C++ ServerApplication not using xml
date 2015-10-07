@@ -374,7 +374,7 @@ int main(int argc, char* argv[])
 			//std::cout << Framebuf << "\n";//display the serialization
 			//iSendResult = send(ClientSocket, (char *)test.c_str(), sizeof(test), 0);
 
-			//before sending, tell Python the size of the xml so it can recieve the complete packet and not parts of it
+			//before sending, tell Python the size so it can recieve the complete packet and not parts of it
 			char buf[50];
 			std::string framesize = itoa(Framebuf.size(), buf, 10);
 			char buf2[50];
@@ -394,7 +394,7 @@ int main(int argc, char* argv[])
 			//listen for a reply before sending
 			iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
 			//Now send the actual data
-			iSendResult = send(ClientSocket, (char *)Framebuf.c_str(), Framebuf.size(), 0);//send the xml
+			iSendResult = send(ClientSocket, (char *)Framebuf.c_str(), Framebuf.size(), 0);//send
 			// Echo the buffer back to the sender
 			//iSendResult = send(ClientSocket, recvbuf, iResult, 0);
 
