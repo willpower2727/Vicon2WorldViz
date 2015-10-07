@@ -1,0 +1,77 @@
+import socket
+import sys
+import io
+import re
+import viz
+import threading
+import Queue
+
+viz.go()#start worldviz
+
+def UpdateViz(root,q):#thread to update WorldViz objects/avatars etc
+	while not endflag.isSet():
+		root = q.get()#pull xml from the queue
+		
+		# parse packet...
+		temp = root.split(',')#split string into parts from csv
+		
+		#update Worldviz objects...
+		#this part of the code is up to you...
+	
+def runclient(root,q):#client to receive from c++ server
+	
+	HOST = 'localhost'   
+	PORT = 50008
+	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	print 'Socket created'
+	print 'Socket now connecting'
+	s.connect((HOST,PORT))
+	s.send('1')
+	while not endflag.isSet():
+		data = s.recv(8)#receive the initial message
+		data3 = data[:3]#get first 3 letters
+		if (data3 == "New"):#this means there is a new frame ready to send
+			nextsizestring = data[3:]
+			nextsizestring2 = nextsizestring.rstrip('\0')
+			nextsize = int(nextsizestring2,10)#this is the size of the next xml string
+			print("Next Packet is size: ")
+			print(nextsize)
+			s.send('b')#tell cpp we are ready for the packet
+			databuf = ''#intialize a buffer
+			while (sys.getsizeof(databuf) < nextsize + 21):#receive until we have the entire xml string
+				data = s.recv(nextsize)
+				databuf = databuf + data
+			root = databuf
+			q.put(root)#place the xml into the queue
+		elif (data3 != "New"):
+			print("WARNING! TCP SYNCH HAS FAILED")
+			break
+		if not data: break
+		s.send('b')
+	s.close()
+
+endflag = threading.Event()
+
+def raisestop(sign):#run's when "q" is pressed on the keyboard
+	print("stop flag raised")
+	endflag.set()
+	t1.join()#stop the treads nicely, giving them time to finish up
+	t2.join()
+	viz.quit()#stop the worldviz window process to have a complete end
+
+root = ''#initialize as empty string
+q = Queue.Queue()
+#create thread for client
+t1 = threading.Thread(target=runclient,args=(root,q))
+t2 = threading.Thread(target=UpdateViz,args=(root,q))
+t1.daemon = True
+t2.daemon = True
+#start the threads
+t1.start()
+t2.start()
+
+print("\n")
+print("press 'q' to stop")
+print("\n")
+
+vizact.onkeydown('q',raisestop,'t')#waits for "q" press to stop data stream
