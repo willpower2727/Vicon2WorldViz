@@ -10,7 +10,7 @@ viz.go()#start worldviz
 
 def UpdateViz(root,q):#thread to update WorldViz objects/avatars etc
 	while not endflag.isSet():
-		root = q.get()#pull xml from the queue
+		root = q.get()#pull frame string from the queue
 		
 		# parse packet...
 		temp = root.split(',')#split string into parts from csv
@@ -33,16 +33,16 @@ def runclient(root,q):#client to receive from c++ server
 		if (data3 == "New"):#this means there is a new frame ready to send
 			nextsizestring = data[3:]
 			nextsizestring2 = nextsizestring.rstrip('\0')
-			nextsize = int(nextsizestring2,10)#this is the size of the next xml string
+			nextsize = int(nextsizestring2,10)#this is the size of the next string
 			print("Next Packet is size: ")
 			print(nextsize)
 			s.send('b')#tell cpp we are ready for the packet
 			databuf = ''#intialize a buffer
-			while (sys.getsizeof(databuf) < nextsize + 21):#receive until we have the entire xml string
+			while (sys.getsizeof(databuf) < nextsize + 21):#receive until we have the entire string
 				data = s.recv(nextsize)
 				databuf = databuf + data
 			root = databuf
-			q.put(root)#place the xml into the queue
+			q.put(root)#place into the queue
 		elif (data3 != "New"):
 			print("WARNING! TCP SYNCH HAS FAILED")
 			break
