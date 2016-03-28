@@ -5,6 +5,7 @@ import re
 import viz
 import threading
 import Queue
+import vizact
 
 viz.go()#start worldviz
 
