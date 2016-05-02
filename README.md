@@ -1,7 +1,7 @@
 # Vicon2WorldViz
 Example code to stream Vicon Nexus data into WorldViz
 
-As of 10/7/2015, there is no supported or other opensource method of streaming motion data from Vicon's Nexus software to WorldViz. The purpose of this repository is to share an opensource method for doing so.
+As of 5/2/2016, there is no supported or other opensource method of streaming motion data from Vicon's Nexus software to WorldViz. The purpose of this repository is to share an opensource method for doing so.
 
 Method:
   Using Vicon SDK a c++ server app requests and relays frame data to a multi-threaded python app that updates Vizard in "real" time. The c++ app in this example reformats frame data into xml string for serialization to the Vizard client. 
